@@ -12,10 +12,12 @@ A small Python bot that checks Mongar tender pages for new tender announcements 
    ```bash
    python3 -m pip install -r requirements.txt
    ```
-2. Set email environment variables. The bot first tries Resend if you provide a key; otherwise it falls back to SMTP:
+2. Set notification environment variables. The bot can send email via Resend or SMTP, and it can also post to Telegram:
    ```bash
    export RESEND_API_KEY=your-resend-api-key
    export RESEND_FROM_EMAIL=onboarding@resend.dev
+   export TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+   export TELEGRAM_CHAT_ID=your-telegram-chat-id
    ```
    Or with SMTP:
    ```bash

@@ -91,6 +91,20 @@ def create_github_issue(title: str, body: str) -> Optional[str]:
     return data.get("html_url")
 
 
+def send_telegram_message(message: str) -> None:
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not bot_token or not chat_id:
+        raise RuntimeError("Telegram credentials are not configured")
+
+    response = requests.post(
+        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+        json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+        timeout=20,
+    )
+    response.raise_for_status()
+
+
 def send_email(to_address: str, subject: str, body: str) -> None:
     resend_api_key = os.getenv("RESEND_API_KEY")
     resend_from_email = os.getenv("RESEND_FROM_EMAIL")
@@ -153,18 +167,25 @@ def check_for_new_tenders(urls: Optional[List[str]] = None, state_path: Optional
                 found_items.append({"title": item["title"], "url": full_url})
 
     save_state(state_path, state)
-    if found_items and to_address:
+    if found_items:
+        message_body = build_email_body(found_items)
+        if to_address:
+            try:
+                send_email(to_address, "New Mongar tenders found", message_body)
+            except Exception:
+                issue_url = create_github_issue(
+                    "New Mongar tenders found",
+                    message_body,
+                )
+                if issue_url:
+                    print(f"Email delivery failed; created GitHub issue: {issue_url}")
+                else:
+                    print("Email delivery failed and no GitHub issue could be created")
+
         try:
-            send_email(to_address, "New Mongar tenders found", build_email_body(found_items))
-        except Exception:
-            issue_url = create_github_issue(
-                "New Mongar tenders found",
-                build_email_body(found_items),
-            )
-            if issue_url:
-                print(f"Email delivery failed; created GitHub issue: {issue_url}")
-            else:
-                print("Email delivery failed and no GitHub issue could be created")
+            send_telegram_message(message_body)
+        except Exception as exc:
+            print(f"Telegram notification failed: {exc}")
     return found_items
 
 

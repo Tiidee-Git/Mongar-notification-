@@ -68,6 +68,15 @@ class NotificationBotTests(unittest.TestCase):
         self.assertEqual(issue_url, "https://example.com/issues/1")
         self.assertTrue(mock_post.called)
 
+    @patch("notification_bot.requests.post")
+    def test_send_telegram_message_uses_bot_api(self, mock_post):
+        mock_post.return_value.status_code = 200
+
+        with patch.dict(os.environ, {"TELEGRAM_BOT_TOKEN": "token", "TELEGRAM_CHAT_ID": "123"}, clear=False):
+            notification_bot.send_telegram_message("Hello")
+
+        self.assertTrue(mock_post.called)
+
 
 if __name__ == "__main__":
     unittest.main()
