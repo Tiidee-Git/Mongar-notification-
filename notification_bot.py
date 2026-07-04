@@ -73,6 +73,24 @@ def build_email_body(items: List[Dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
+def create_github_issue(title: str, body: str) -> Optional[str]:
+    repository = os.getenv("GITHUB_REPOSITORY")
+    token = os.getenv("GITHUB_TOKEN")
+    if not repository or not token:
+        return None
+
+    response = requests.post(
+        f"https://api.github.com/repos/{repository}/issues",
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
+        json={"title": title, "body": body},
+        timeout=20,
+    )
+    if response.status_code >= 400:
+        return None
+    data = response.json()
+    return data.get("html_url")
+
+
 def send_email(to_address: str, subject: str, body: str) -> None:
     resend_api_key = os.getenv("RESEND_API_KEY")
     resend_from_email = os.getenv("RESEND_FROM_EMAIL")
@@ -136,7 +154,17 @@ def check_for_new_tenders(urls: Optional[List[str]] = None, state_path: Optional
 
     save_state(state_path, state)
     if found_items and to_address:
-        send_email(to_address, "New Mongar tenders found", build_email_body(found_items))
+        try:
+            send_email(to_address, "New Mongar tenders found", build_email_body(found_items))
+        except Exception:
+            issue_url = create_github_issue(
+                "New Mongar tenders found",
+                build_email_body(found_items),
+            )
+            if issue_url:
+                print(f"Email delivery failed; created GitHub issue: {issue_url}")
+            else:
+                print("Email delivery failed and no GitHub issue could be created")
     return found_items
 
 

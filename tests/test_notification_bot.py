@@ -57,6 +57,17 @@ class NotificationBotTests(unittest.TestCase):
 
         self.assertTrue(mock_post.called)
 
+    @patch("notification_bot.requests.post")
+    def test_create_github_issue_posts_to_repository_api(self, mock_post):
+        mock_post.return_value.status_code = 201
+        mock_post.return_value.json.return_value = {"html_url": "https://example.com/issues/1"}
+
+        with patch.dict(os.environ, {"GITHUB_REPOSITORY": "owner/repo", "GITHUB_TOKEN": "token"}, clear=False):
+            issue_url = notification_bot.create_github_issue("Title", "Body")
+
+        self.assertEqual(issue_url, "https://example.com/issues/1")
+        self.assertTrue(mock_post.called)
+
 
 if __name__ == "__main__":
     unittest.main()
