@@ -1,6 +1,5 @@
 import json
 import os
-import re
 from pathlib import Path
 from typing import Dict, List, Optional
 from urllib.parse import urljoin
@@ -34,6 +33,14 @@ def save_state(state_path: Optional[Path] = None, state: Optional[Dict[str, bool
 def extract_tender_items_from_html(html: str) -> List[Dict[str, str]]:
     soup = BeautifulSoup(html, "html.parser")
     items: List[Dict[str, str]] = []
+
+    for item in soup.find_all(["item", "entry"]):
+        title = " ".join(item.find("title").get_text(" ", strip=True).split()) if item.find("title") else ""
+        link_tag = item.find("link")
+        href = link_tag.get_text(" ", strip=True) if link_tag else ""
+        if title and ("tender" in title.lower()):
+            items.append({"title": title, "url": href})
+
     for link in soup.find_all("a", href=True):
         title = " ".join(link.get_text(" ", strip=True).split())
         href = link["href"]
@@ -43,6 +50,7 @@ def extract_tender_items_from_html(html: str) -> List[Dict[str, str]]:
         is_announcement = "announcement" in lower_title or "announcement" in lower_href
         if is_tender_link and not is_announcement:
             items.append({"title": title, "url": href})
+
     return items
 
 
@@ -66,6 +74,23 @@ def build_email_body(items: List[Dict[str, str]]) -> str:
 
 
 def send_email(to_address: str, subject: str, body: str) -> None:
+    resend_api_key = os.getenv("RESEND_API_KEY")
+    resend_from_email = os.getenv("RESEND_FROM_EMAIL")
+    if resend_api_key and resend_from_email:
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {resend_api_key}", "Content-Type": "application/json"},
+            json={
+                "from": resend_from_email,
+                "to": [to_address],
+                "subject": subject,
+                "text": body,
+            },
+            timeout=20,
+        )
+        response.raise_for_status()
+        return
+
     smtp_host = os.getenv("SMTP_HOST")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER")

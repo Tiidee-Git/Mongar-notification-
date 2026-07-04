@@ -2,6 +2,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import notification_bot
 
@@ -29,6 +30,32 @@ class NotificationBotTests(unittest.TestCase):
             notification_bot.save_state(state_path, {"https://example.com/tender": True})
             reloaded = notification_bot.load_state(state_path)
             self.assertTrue(reloaded["https://example.com/tender"])
+
+    def test_extract_tender_items_from_rss_feed(self):
+        rss = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <rss version="2.0">
+          <channel>
+            <item>
+              <title>Tender for Mongar road works</title>
+              <link>https://example.com/tender-rss</link>
+            </item>
+          </channel>
+        </rss>
+        """
+        items = notification_bot.extract_tender_items_from_html(rss)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["title"], "Tender for Mongar road works")
+
+    @patch("notification_bot.requests.post")
+    def test_send_email_uses_resend_when_configured(self, mock_post):
+        mock_post.return_value.status_code = 200
+        mock_post.return_value.json.return_value = {"id": "msg_123"}
+
+        with patch.dict(os.environ, {"RESEND_API_KEY": "test-key", "RESEND_FROM_EMAIL": "sender@example.com"}, clear=False):
+            notification_bot.send_email("recipient@example.com", "Subject", "Body")
+
+        self.assertTrue(mock_post.called)
 
 
 if __name__ == "__main__":

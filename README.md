@@ -12,7 +12,12 @@ A small Python bot that checks Mongar tender pages for new tender announcements 
    ```bash
    python3 -m pip install -r requirements.txt
    ```
-2. Set SMTP environment variables:
+2. Set email environment variables. The bot first tries Resend if you provide a key; otherwise it falls back to SMTP:
+   ```bash
+   export RESEND_API_KEY=your-resend-api-key
+   export RESEND_FROM_EMAIL=onboarding@resend.dev
+   ```
+   Or with SMTP:
    ```bash
    export SMTP_HOST=smtp.example.com
    export SMTP_PORT=587
