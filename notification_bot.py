@@ -6,6 +6,8 @@ from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 
 DEFAULT_URLS = [
@@ -31,15 +33,21 @@ def save_state(state_path: Optional[Path] = None, state: Optional[Dict[str, bool
 
 
 def extract_tender_items_from_html(html: str) -> List[Dict[str, str]]:
-    soup = BeautifulSoup(html, "html.parser")
+    parser = "xml" if html.lstrip().startswith("<?xml") or "<rss" in html.lower() or "<feed" in html.lower() else "html.parser"
+    soup = BeautifulSoup(html, parser)
     items: List[Dict[str, str]] = []
 
     for item in soup.find_all(["item", "entry"]):
-        title = " ".join(item.find("title").get_text(" ", strip=True).split()) if item.find("title") else ""
-        link_tag = item.find("link")
-        href = link_tag.get_text(" ", strip=True) if link_tag else ""
+        title_tag = item.find("title")
+        title = " ".join(title_tag.get_text(" ", strip=True).split()) if title_tag else ""
+        url = ""
+        if item.find("link"):
+            if item.find("link").has_attr("href"):
+                url = item.find("link")["href"]
+            else:
+                url = item.find("link").get_text(" ", strip=True)
         if title and ("tender" in title.lower()):
-            items.append({"title": title, "url": href})
+            items.append({"title": title, "url": url})
 
     for link in soup.find_all("a", href=True):
         title = " ".join(link.get_text(" ", strip=True).split())
@@ -55,7 +63,24 @@ def extract_tender_items_from_html(html: str) -> List[Dict[str, str]]:
 
 
 def fetch_page(url: str) -> str:
-    response = requests.get(url, timeout=15)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection": "keep-alive",
+    }
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "OPTIONS"],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+
+    response = session.get(url, headers=headers, timeout=15)
     response.raise_for_status()
     return response.text
 
@@ -154,7 +179,12 @@ def check_for_new_tenders(urls: Optional[List[str]] = None, state_path: Optional
     found_items: List[Dict[str, str]] = []
 
     for url in urls:
-        html = fetch_page(url)
+        try:
+            html = fetch_page(url)
+        except Exception as exc:
+            print(f"Failed to fetch {url}: {exc}")
+            continue
+
         items = extract_tender_items_from_html(html)
         for item in items:
             href = item["url"]
