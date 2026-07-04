@@ -26,9 +26,9 @@ jobs:
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_USER: ${{ secrets.SMTP_USER || 'trasheeydaawaa123@gmail.com' }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          MAIL_FROM: ${{ secrets.MAIL_FROM }}
-          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM || 'trasheeydaawaa123@gmail.com' }}
+          NOTIFICATION_EMAIL: ${{ secrets.NOTIFICATION_EMAIL || 'trasheeydaawaa123@gmail.com' }}
         run: |
           python notification_bot.py --to "$NOTIFICATION_EMAIL"
